@@ -45,49 +45,96 @@ public class MySolver implements Flow.Solver {
             boolean outChanged = false;
             
             
-              
+            int it =0;   // debug counter
             /* iterative alg for a forward data flow */
             do{
+                System.out.format("Iteration %d\n",it); it++;
                 outChanged =false;
                 QuadIterator iter = new QuadIterator(cfg, true);
+
+                int i = 0; // debug counter
+
                 while(iter.hasNext()){
 
                     /* meet with the OUTs of all predecessors to compute IN */
+                    System.out.format("Basic block %d\n", i );
+                    i++;
+                    if (!iter.hasPrevious()){
+                        iter.next();
+                        continue;
+                    }
+                    iter.predecessors();
 
                     java.util.Iterator<Quad> preds = iter.predecessors();
-
                     Quad currentQuad = (Quad)iter.next();
-                    Flow.DataflowObject oldOut = this.analysis.getOut(currentQuad);
+                    Flow.DataflowObject oldOut = this.analysis.getOut(currentQuad)
                     Flow.DataflowObject meetResult = this.analysis.newTempVar();
 
                     while(preds.hasNext()){
                         Quad prevQuad =  (Quad)preds.next();
-                        meetResult.meetWith(this.analysis.getOut(prevQuad));
+                        if (prevQuad !=null){
+                            meetResult.meetWith(this.analysis.getOut(prevQuad));
+                        }
                     }
                     this.analysis.setIn(currentQuad,meetResult);
 
                     /* compute OUT using transfer function */
-
                     this.analysis.processQuad(currentQuad);
 
                     /* check changes to OUT */
                     if (oldOut != this.analysis.getOut(currentQuad)){
-                        outChanged = true;
+                        /* !!! instruction below causes infinite loop */
+                           outChanged = true;
                     }
-
-
-                    
-                    
                 }
-
-                /* check whether any OUT changed */
-
 
             }while(outChanged);
 
 
         }else{
             System.out.println("Backward dataflow.");
+            boolean inChanged = false;
+
+            /* iterative alg for a forward data flow */
+            do{
+                inChanged =false;
+                QuadIterator iter = new QuadIterator(cfg,false);
+
+                while(iter.hasNext()){
+                    /* meet with the INs of all successors of compute OUT
+                    */
+
+                    if (iter.successors() == null){
+                        iter.next();
+                        continue;
+                    }
+                    iter.successors();
+
+                    java.util.Iterator<Quad> preds = iter.predecessors();
+                    Quad currentQuad = (Quad)iter.next();
+                    Flow.DataflowObject oldOut = this.analysis.getOut(currentQuad)
+                    Flow.DataflowObject meetResult = this.analysis.newTempVar();
+
+                    while(preds.hasNext()){
+                        Quad prevQuad =  (Quad)preds.next();
+                        if (prevQuad !=null){
+                            meetResult.meetWith(this.analysis.getOut(prevQuad));
+                        }
+                    }
+                    this.analysis.setIn(currentQuad,meetResult);
+
+                    /* compute OUT using transfer function */
+                    this.analysis.processQuad(currentQuad);
+
+                    /* check changes to OUT */
+                    if (oldOut != this.analysis.getOut(currentQuad)){
+                        /* !!! instruction below causes infinite loop */
+                           outChanged = true;
+                    }
+                }
+
+            }while(outChanged);
+
         }
         
 
