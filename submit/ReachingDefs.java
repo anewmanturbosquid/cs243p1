@@ -1,7 +1,20 @@
+
 package submit;
 
 // some useful things to import. add any additional imports you need.
-import joeq.Compiler.Quad.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeMap;
+
+import joeq.Compiler.Quad.ControlFlowGraph;
+import joeq.Compiler.Quad.Operand.RegisterOperand;
+import joeq.Compiler.Quad.Quad;
+import joeq.Compiler.Quad.QuadIterator;
 import flow.Flow;
 
 /**
@@ -20,10 +33,63 @@ public class ReachingDefs implements Flow.Analysis {
          * See Flow.java for the meaning of these methods.
          * These need to be filled in.
          */
-        public void setToTop() {}
-        public void setToBottom() {}
-        public void meetWith (Flow.DataflowObject o) {}
-        public void copy (Flow.DataflowObject o) {}
+
+    	// Use * SortedSets and SortedMaps instead of the normal kinds.
+        Map<Integer,String> sortedMap = new TreeMap<Integer,String>();
+
+        public MyDataflowObject()
+        {
+        	this.initSortedMap();
+        }
+
+        public void initSortedMap()
+        {
+        	this.sortedMap = new TreeMap<Integer,String>();
+        }
+        
+        public void setToTop() 
+        {
+        	this.initSortedMap();
+
+        }
+
+        public void setToBottom() 
+        {
+        	this.initSortedMap();
+
+        }
+
+
+        public void meetWith (Flow.DataflowObject o) 
+        {
+            MyDataflowObject curObject = (MyDataflowObject) o;
+            
+//            HashSet<Integer> keySet = (HashSet<Integer>) curObject.sortedMap.keySet();
+            Set<Integer> keySet = curObject.sortedMap.keySet();
+            
+            for (int key : keySet)
+            {
+            	this.sortedMap.put(key, curObject.sortedMap.get(key));
+            }
+            	
+
+        }
+
+
+//        public void addAll(Flow.DataflowObject o)
+//        {
+//        	
+//        }
+        
+        public void copy (Flow.DataflowObject object) 
+        {
+            MyDataflowObject curObject = (MyDataflowObject) object;
+            
+            this.sortedMap = new TreeMap<Integer,String>(curObject.sortedMap);
+            
+        }
+        
+
 
         /**
          * toString() method for the dataflow objects which is used
@@ -35,8 +101,82 @@ public class ReachingDefs implements Flow.Analysis {
          * your reaching definitions analysis must match this exactly.
          */
         @Override
-        public String toString() { return ""; }
+        public String toString() 
+        { 
+        	return this.sortedMap.keySet().toString(); 
+        }
+        
+        public void gen(String s, int id)
+        {
+        	this.sortedMap.put(id, s);
+        }
+        
+        public void kill(String s)
+        {
+        	//invert, remove, invert again--don't care about duplicates, bc it's getting removed anyway
+        	
+//        	Map<String,Integer> tempMap = this.invertMap(this.sortedMap);
+//        	
+//        	tempMap.remove(s);
+//        	
+//        	this.sortedMap = this.invertMap(tempMap);
+
+        	List<Integer> keys = getKey(s, this.sortedMap);
+        	
+        	this.sortedMap.keySet().removeAll(keys);
+        	
+
+        }
+        
+//        //adapted from http://stackoverflow.com/questions/7146990/java-invert-map
+//        private <V, K> Map<V, K> invertMap(Map<K, V> map) {
+//
+//            Map<V, K> inv = new TreeMap<V, K>();
+//
+//            for (Entry<K, V> entry : map.entrySet())
+//                inv.put(entry.getValue(), entry.getKey());
+//
+//            return inv;
+//        }
+        
+        //from http://stackoverflow.com/questions/11795777/how-to-get-key-depending-upon-the-value-from-hashmap
+        /**
+         * Return keys associated with the specified value
+         */
+        public List<Integer> getKey(String value, Map<Integer, String> map) {
+          List<Integer> keys = new ArrayList<Integer>();
+          for(Entry<Integer, String> entry:map.entrySet()) {
+            if(value.equals(entry.getValue())) {
+              keys.add(entry.getKey());
+            }
+          }
+          return keys;
+        }
+        
+        public boolean equals(Object object)
+        {
+
+            MyDataflowObject castedobj = (MyDataflowObject) object;
+            
+            if (this.sortedMap.equals(castedobj.sortedMap))
+            	return true;
+            else 	
+            	return false;
+            
+            
+        }
+        
+        
+        public int hashCode() 
+        {
+        	
+            return this.sortedMap.hashCode();
+            
+        }
+        
     }
+    
+    
 
     /**
      * Dataflow objects for the interior and entry/exit points
@@ -48,6 +188,8 @@ public class ReachingDefs implements Flow.Analysis {
      */
     private MyDataflowObject[] in, out;
     private MyDataflowObject entry, exit;
+    
+    private ArrayList<Integer> exitBlocks;
 
     /**
      * This method initializes the datflow framework.
@@ -87,6 +229,37 @@ public class ReachingDefs implements Flow.Analysis {
         /************************************************
          * Your remaining initialization code goes here *
          ************************************************/
+        
+        this.exitBlocks = new ArrayList<Integer>();
+        
+        //find blocks that exit
+        
+        int i=1;
+        QuadIterator newIter = new QuadIterator(cfg);
+//        newIter.next();
+        
+
+        
+        while (newIter.hasNext()) 
+        {
+        	Quad curQuad = newIter.next();
+        	Iterator<Quad> successors = newIter.successors();
+
+//        	System.out.println(i);
+        	
+        	HashSet<Quad> curSuccSet = new HashSet<Quad>();
+        	
+        	while (successors.hasNext())
+        		curSuccSet.add(successors.next());
+        	
+        	if (curSuccSet.contains(null))
+//        		System.out.println(i);
+        		this.exitBlocks.add(curQuad.getID());
+        	
+        	
+        	i+=1;
+        }
+//        System.out.println("hi");
     }
 
     /**
@@ -114,15 +287,107 @@ public class ReachingDefs implements Flow.Analysis {
      * See Flow.java for the meaning of these methods.
      * These need to be filled in.
      */
-    public boolean isForward () { return false; }
-    public Flow.DataflowObject getEntry() { return null; }
-    public Flow.DataflowObject getExit() { return null; }
-    public void setEntry(Flow.DataflowObject value) {}
-    public void setExit(Flow.DataflowObject value) {}
-    public Flow.DataflowObject getIn(Quad q) { return null; }
-    public Flow.DataflowObject getOut(Quad q) { return null; }
-    public void setIn(Quad q, Flow.DataflowObject value) {}
-    public void setOut(Quad q, Flow.DataflowObject value) {}
-    public Flow.DataflowObject newTempVar() { return null; }
-    public void processQuad(Quad q) {}
+    public boolean isForward () { return true; }
+    
+    
+    //mostly taken from corresponding code in ConstantProp.java
+    
+    
+    public Flow.DataflowObject getEntry() 
+    { 
+        Flow.DataflowObject result = newTempVar();
+        result.copy(this.entry); 
+        return result;
+        
+//        return this.entry;
+    }
+    public Flow.DataflowObject getExit()
+    { 
+        Flow.DataflowObject result = newTempVar();
+        result.copy(this.exit); 
+        return result;
+        
+    }
+    
+    public void setEntry(Flow.DataflowObject value)
+    {
+    	this.entry.copy(value);
+    }
+    public void setExit(Flow.DataflowObject value)
+    {
+//    	this.exit.copy(value);
+    	
+        Flow.DataflowObject result = newTempVar();
+        result.copy(this.exit); 
+        
+//        System.out.println(this.exitBlocks);
+
+    	
+    	for (int curInt : this.exitBlocks)
+    	{
+//    		System.out.println(curInt);
+    		result.meetWith(out[curInt]);
+    	}
+    	
+    	this.exit.copy(result);
+    	
+//    	System.out.println("hi");
+//    	this.exit.meetWith(value);
+    }
+    
+    public Flow.DataflowObject getIn(Quad q) { 
+        Flow.DataflowObject result = newTempVar();
+        result.copy(in[q.getID()]); 
+        return result;
+    }
+    public Flow.DataflowObject getOut(Quad q) { 
+        Flow.DataflowObject result = newTempVar();
+        result.copy(out[q.getID()]); 
+        return result;
+    }
+    
+    public void setIn(Quad q, Flow.DataflowObject value) 
+    { 
+        this.in[q.getID()].copy(value); 
+    }
+    public void setOut(Quad q, Flow.DataflowObject value)
+    { 
+        this.out[q.getID()].copy(value); 
+    }
+    
+    public Flow.DataflowObject newTempVar()
+    { 
+    	MyDataflowObject curObj = new MyDataflowObject();
+    	return curObj; 
+    }
+    
+    public void processQuad(Quad q)
+    {
+    	MyDataflowObject curObj = new MyDataflowObject ();
+    	
+    	
+    	curObj.copy(in[q.getID()]);
+    	
+    	//q.getUsedRegisters()
+    	
+        for (RegisterOperand tempDefinedRegister : q.getDefinedRegisters()) 
+        	curObj.kill(tempDefinedRegister.getRegister().toString());
+      
+        for (RegisterOperand tempDefinedRegister : q.getDefinedRegisters()) 
+        	curObj.gen(tempDefinedRegister.getRegister().toString(), q.getID());
+        
+        
+//        System.out.println(q.getID());
+        
+//        System.out.println(q.getDefinedRegisters());
+//        System.out.println(q.getUsedRegisters());
+        
+//        Helper.runPass(q, transferfn);
+        
+        
+        out[q.getID()].copy(curObj);
+    	
+    	
+    }
+    
 }
